@@ -5,6 +5,6 @@
 </p>	
 <h2>Q2: Select table info</h2>
 <p>Select second row:  <code>$('.wikitable>tbody>tr:eq(2)')</code></p>
-<p>Select all table rows:  $('.wikitable>tbody>tr:not(:eq(0))')</code></p>
+<p>Select all table rows:  <code>$('.wikitable>tbody>tr:not(:eq(0))')</code></p>
 
 

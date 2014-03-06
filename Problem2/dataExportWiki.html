@@ -12,24 +12,42 @@
 
 <script>
     var convertToInt;
-
+    var table;
     $.ajax({
         url: "http://en.wikipedia.org/wiki/World_population_estimates",
         type: 'GET',
         cache: false,
         success: function(data) {
-            var root,allData, body, table;
+            var root,allData, body;
             root = $("<div></div>")
             root.html(data.responseText)
 
-            var content = root.find("#content"); // find all the nodes that have ID "content"
-            var h2s = content.find(".mw-headline"); // search in all "content" nodes for nodes of class ".mw-headline"
+            table = root.find('#mw-content-text>table>tbody'); 
+            var thead = table.find("tr:eq(0) th:nth-child(-n+6)");
+            var tdata = table.find("tr:not(:eq(0))").map(function()
+              { return $(this).find("td:nth-child(-n+6)"); })
+            var arrayOfLines = [];
+            
+            var headers = [];
+            thead.each(function () { 
+              headers.push($(this).children()[0].innerHTML);
+            })
+            arrayOfLines.push(headers.join(','));
 
-            $.each(h2s, function(index, value) {
-                console.log($(value).text()); // print text
+            $.each(tdata, function(i, row) {
+              var outputRow = [];
+              
+              $.each(row, function(j, cell) {
+                var value = $(cell).children()[0];
+                if (value == undefined) { outputRow.push(""); }
+                else { outputRow.push(convertToInt(value.innerHTML)); }
+              });
+              arrayOfLines.push(outputRow.join(','));
             });
+
 			
-			saveToFile(["Hello World"],"test.txt")
+
+			saveToFile(arrayOfLines,"data.csv")
         },
         error: function() {
             return console.log("error");
@@ -37,7 +55,12 @@
     });
 
     convertToInt = function(s) {
-        return parseInt(s.replace(/,/g, ""), 10);
+        var neg = 1;
+        if (s.charCodeAt(0) == 8722) { 
+          s = s.slice(1); 
+          neg = -1;
+        }
+        return parseInt(s.replace(/,/g, ""), 10) * neg;
     };
 	
     /* takes an array of strings
