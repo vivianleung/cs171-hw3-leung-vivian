@@ -18,36 +18,33 @@
         type: 'GET',
         cache: false,
         success: function(data) {
-            var root,allData, body;
-            root = $("<div></div>")
-            root.html(data.responseText)
+          var root,allData, body;
+          root = $("<div></div>")
+          root.html(data.responseText)
 
-            table = root.find('#mw-content-text>table>tbody'); 
-            var thead = table.find("tr:eq(0) th:nth-child(-n+6)");
-            var tdata = table.find("tr:not(:eq(0))").map(function()
-              { return $(this).find("td:nth-child(-n+6)"); })
-            var arrayOfLines = [];
+          table = root.find('#mw-content-text>table>tbody'); 
+          var thead = table.find("tr:eq(0) th:nth-child(-n+6)");
+          var tdata = table.find("tr:not(:eq(0))").map(function()
+            { return $(this).find("td:nth-child(-n+6)"); })
+          var arrayOfLines = [];
+          
+          var headers = [];
+          thead.each(function () { 
+            headers.push($(this).children()[0].innerHTML);
+          })
+          arrayOfLines.push(headers.join(','));
+
+          $.each(tdata, function(i, row) {
+            var outputRow = [];
             
-            var headers = [];
-            thead.each(function () { 
-              headers.push($(this).children()[0].innerHTML);
-            })
-            arrayOfLines.push(headers.join(','));
-
-            $.each(tdata, function(i, row) {
-              var outputRow = [];
-              
-              $.each(row, function(j, cell) {
-                var value = $(cell).children()[0];
-                if (value == undefined) { outputRow.push(""); }
-                else { outputRow.push(convertToInt(value.innerHTML)); }
-              });
-              arrayOfLines.push(outputRow.join(','));
+            $.each(row, function(j, cell) {
+              var value = $(cell).children()[0];
+              if (value == undefined) { outputRow.push(""); }
+              else { outputRow.push(convertToInt(value.innerHTML)); }
             });
-
-			
-
-			saveToFile(arrayOfLines,"data.csv")
+            arrayOfLines.push(outputRow.join(','));
+          });
+		      saveToFile(arrayOfLines,"timeline.csv")
         },
         error: function() {
             return console.log("error");
