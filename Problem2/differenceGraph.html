@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title></title>
+    <script src="../libs/d3.v3.min.js"></script>
+    <script src="../libs/jquery-1.10.1.js"></script>
+    <style>
+        .axis path,
+        .axis line {
+            fill: none;
+            stroke: lightgrey; }
+
+        .dataArea {
+            stroke: 1px steelblue;
+            fill:steelblue;
+            fill-opacity:0.5;
+            clip-path: url(#clip);
+        }
+        .line{
+            fill: none;
+        }
+        .overlay {
+          fill: none;
+          pointer-events: all;
+        } 
+
+
+    </style>
+
+</head>
+<body>
+    <div id="vis"></div>
+
+
+	<script src = "differenceGraph.js"></script>
+
+
+</body>
+</html>
