@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title></title>
+
+    <script src="../libs/jquery-1.10.1.js"></script>
+    <script src="../libs/jquery.xdomainajax.js"></script>
+    <script src="../libs/d3.v3.min.js"></script>
+    <script src="../libs/FileSaver.js"></script>
+</head>
+<body>
+
+<script>
+    var convertToInt;
+    var table;
+    var datums;
+    $.ajax({
+        url: "http://unglobalpulse.net/ewec",
+        type: 'GET',
+        cache: false,
+        success: function(data) {
+          var root,allData, body;
+          root = $("<div></div>")
+          root.html(data.responseText)
+          datums = root;
+
+          table = root.find('tbody'); 
+          var arrayOfLines = [];
+
+          [1, 4].forEach(function(n, i) {
+            var tdata = table.find("tr td:nth-child("+n+")");
+            tdata = tdata.map(function(k, v) {
+              return $(v).children()[0].innerHTML;
+            });
+
+            tdata.each(function(d, j) {
+              if (arrayOfLines[d]) {arrayOfLines[d].push(parseVal(j));}
+              else {arrayOfLines[d] = [parseVal(j)];}
+            })
+                               
+          })
+		      saveToFile(arrayOfLines,"unHealth.csv")
+        },
+        error: function() {
+            return console.log("error");
+        }
+    });
+
+    parseVal = function(s) {
+        return s.replace(/,/g, "");
+    };
+	
+    /* takes an array of strings
+       and writes them line by line into a file given by filename
+     */
+    var saveToFile = function(arrayOfLines, fileName) {
+       /* adds linebreaks at the end*/
+       var blob, blobText;
+       blobText = arrayOfLines.map(function(d) {
+         d = d.join(",");
+         if (d.endsWith("\n")) {
+           return d;
+         } else {
+           return d + "\n";
+         }
+       });
+       blob = new Blob(blobText, {
+         type: "text/plain;charset=utf-8"
+       });
+       return saveAs(blob, fileName);
+     };
+
+     String.prototype.endsWith = function(suffix) {
+       return this.indexOf(suffix, this.length - suffix.length) !== -1;
+     };
+	
+
+
+
+</script>
+
+
+</body>
+</html>

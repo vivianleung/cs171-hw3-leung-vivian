@@ -3,11 +3,33 @@
 <head>
     <title></title>
     <script src="../libs/d3.v3.min.js"></script>
+    <link href='http://fonts.googleapis.com/css?family=Roboto:900,700,400,300' rel='stylesheet' type='text/css'>
     <style>
+        body{
+            font-family: 'Roboto', sans-serif;
+            font-weight: 300;
+            fill: steelblue;
+            text-align: center;
+        }
+        h1 {
+            font-weight: 900;
+            font-size: 36px;
+            margin-bottom: 2px;
+
+        }
+        h2 {
+            font-weight: 700;
+            font-size: 24px;
+            margin-top: 2px;
+        }
         .axis path,
         .axis line {
             fill: none;
             stroke: lightgrey; }
+        .axis .label {
+            font-weight: 400;
+            fill: black;
+        }
 
         .brush .extent {
             stroke: black;
@@ -37,20 +59,29 @@
             stroke-width:2;
         }
 
-
-
         .detailArea {
             stroke: none;
             fill:steelblue;
             fill-opacity:0.5;
         }
 
+        .incogArea{
+            stroke: none;
+            fill:none;
+        }
+
+        .points{
+            fill:steelblue;
+        }
+ 
+
     </style>
 
 </head>
 <body>
+<h1>UN: EVERY WOMAN, EVERY CHILD</h1>
+<h2>Women's Health</h2>
 <div id="visUN"></div>
-
 
 	<script src="unHealth.js"></script>
 
