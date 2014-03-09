@@ -38,9 +38,9 @@ var keys;
 
 var stories = [
   {dates: ["October 2011", "April 2012"], 
-      story: "Increase in overall Twitter use causes increase in relevant tweets, as seen in this transitional period. Surprisingly, tweets on Women's Health remains low despite increases in overall women's and children's health tweets, until March 2012, the time of the annual Women's History Month."},
+      story: "Increase in overall Twitter use causes increase in relevant tweets, as seen in this transitional period. Surprisingly, tweets on Women's Health remains low despite increases in overall women's and children's health tweets, until March 2012, the time of the annual Women's History Month. (click to escape)"},
   {dates: ["February 2012", "September 2012"], 
-      story: "Women's health tweets drop to baseline levels after March, while total tweets maintain high levels, suggesting children's health tweets have increased. Women's health tweets remain a smaller fraction of all relevant tweets until August 2012. After this period, categorically and total relevant tweets stabilize."}
+      story: "Women's health tweets drop to baseline levels after March, while total tweets maintain high levels, suggesting children's health tweets have increased. Women's health tweets remain a smaller fraction of all relevant tweets until August 2012. After this period, categorically and total relevant tweets stabilize. (click to escape)"}
 ]
 
 var parseDate = d3.time.format("%B %Y").parse;
@@ -155,14 +155,14 @@ createOverview = function() {
 
   var bubble = svg.append("g").attr("id", "storyexpand")
       .attr("transform", function() {
-        var gY = margin.top + bbOverview.y + d3.select('g.legend')[0][0].getBBox().height+d3.select('g.overview')[0][0].getBBox().height + padding/2;
+        var gY = margin.top + bbOverview.y + d3.select('g.legend')[0][0].getBBox().height+d3.select('g.overview')[0][0].getBBox().height - 5;
         return "translate("+bbDetail.x+","+gY+")"});
 
-  over.append("g").attr("class", "brush").call(brush)
+  over.append("g").attr("class", "brush")
+    .attr({ width: bbOverview.w + brushPadding, transform: "translate("+bbOverview.x+",0)"})
+    .call(brush)
     .selectAll("rect").attr({
-      height: bbOverview.h + brushPadding,
-      y: bbOverview.y - brushPadding
-  });
+      height: bbOverview.h + brushPadding, y: bbOverview.y - brushPadding });
 
   // gets the set of values of a prop across nested arrays of objects
   function getSet(attr) {
@@ -179,8 +179,8 @@ createOverview = function() {
   }
 
   function makeAxes (bb, scales, g) {
-    var xAxis = d3.svg.axis().scale(scales.x).orient("bottom")
-                .tickFormat(function(d) {return axisDate(d)});
+    var xax = d3.svg.axis().scale(scales.x).orient("bottom")
+          .tickFormat(function(d) {return axisDate(d)}); 
 
     var yAxis = d3.svg.axis().scale(scales.y).orient("left")
                 .tickFormat( function(d) {return d/1000})
@@ -188,10 +188,19 @@ createOverview = function() {
   
     g.append("g").attr("class", "x axis")
       .attr("transform", "translate("+bb.x+","+(bb.h+bb.y)+")")
-      .call(xAxis)
+      .call(xax)
       .selectAll("text")
-      .attr({'text-anchor': 'start', 'transform': "rotate(-45)","dy": 10, "dx": -30})
+      .attr("class", "ticklabels");
+
+    var xAxis = function() {
+      g.select('g.x.axis')
+        .selectAll("text.ticklabels")
+        .attr({ 'text-anchor': 'start', 'transform': "rotate(-45)","dy": 10, "dx": -30});
+      return xax;
+    }
     
+    xAxis();
+
     g.select('g.x.axis').append("text")
       .attr({x: bb.w, dy: 75, class: 'label' })
       .style("text-anchor", "end")
@@ -240,65 +249,76 @@ createOverview = function() {
   function clicked(story) {
 
     var textPad = 4;
-
+    var textWidth = bbDetail.w - textPad*2;
     bubble.append("text").text(story.story)
-    var rectH = wrap(d3.select('#storyexpand'), bbDetail.w - textPad*2) + 2*textPad;
-    bubble.append("rect").attr({id: "storybox", width: rectH});
+    wrap(d3.select('#storyexpand'), textWidth);
+
 
     var extent = story.dates.map(function(d) {return parseDate(d);})
+    console.log(extent);
     brush = brush.extent(extent);
     var scaledE = scalesOverview.x(brush.extent()[1]);
     var scaledW = scalesOverview.x(brush.extent()[0]);
     var brushDom = d3.select('g.brush')
-    brushDom.select('.extent').attr({width: scaledE-scaledW, 
-      transform: "translate("+scaledW+",0)"});
+    brushDom.select('.extent').attr({width: scaledE-scaledW, x: scaledW});
     brushDom.select('resize.e').select('rect').attr("transform", "translate("+scaledE+",0)");
     brushDom.select('resize.w').select('rect').attr("transform", "translate("+scaledW+",0)");
     brushed();
 
-    var clearStory = function() {    
-      brush.clear();
-      brushed();
-      bubble.select('text').exit().remove()
-      console.log("exited");
-    }
 
-    
-    return;
-    // mouse on click, remove
+    d3.select('#storybox').on("click", function(){
+      this.remove();
+      d3.selectAll('.storylines').remove();
+      brush = brush.clear();
+      brushDom.select('.extent').attr({width: 0, x: 0});
+      brushDom.select('resize.e').select('rect').attr("transform", "translate(0,0)");
+      brushDom.select('resize.w').select('rect').attr("transform", "translate(0,0)");
+      brushed();
+    })
+  
+
 
   
   // adapted from mbostock http://bl.ocks.org/mbostock/7555321
   function wrap(tBox, width) {
     var text = tBox.select('text')[0][0];
     var totalLen = text.getComputedTextLength();
-    var lperRow = text.innerHTML.length/(totalLen / width)
+    var lperRow = text.innerHTML.length/(totalLen / width) ;
     var words = text.innerHTML.split(' ').reverse();
     var lineH = parseInt(window.getComputedStyle(text).fontSize) * 1.1;
     var w = words.pop();
     var counter = w.length;
-    var line;
+    var line = "";
     var i = 0;
+    var wrapping = [];
     tBox.select('text').remove();
-    console.log(lperRow);
-
-    while (w) {
+    var max = 0;
+    while (w != undefined) {
       if (w.length+counter > lperRow) {
-        console.log(line);
-        tBox.append('text')
-            .attr("x", 4)
-            .attr("y", i*lineH)
-            .text(line);
-        i++;
+        wrapping.push(line)
+        line = ""; 
+        counter = 0;
+        i++; 
       }
       else {
         line = line + " "+w;
         counter = w.length + counter + 1;
         w = words.pop();
-        console.log(w);
       }
     }
-    return i * lineH;
+    wrapping.push(line);
+
+    tBox.selectAll('text').data(d3.values(wrapping)).enter().append('text')
+      .attr({ x:textPad, class: 'storylines', 'vertical-align': "text-top"})
+    .attr("y", function(d, j) {return j*lineH;})
+    .text(function(d) {return d});
+    
+    var rectH = (i+1)*lineH + 2*textPad;
+    bubble.append("rect")
+      .attr({id: "storybox", width: bbDetail.w, height: rectH, x: 0, y: -lineH})
+
+    return;
+
   }
 }
 };
