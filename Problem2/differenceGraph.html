@@ -5,10 +5,32 @@
     <script src="../libs/d3.v3.min.js"></script>
     <script src="../libs/jquery-1.10.1.js"></script>
     <style>
+
+        body{
+            font-family: 'Roboto', sans-serif;
+            font-weight: 300;
+            fill: steelblue;
+            text-align: center;
+        }
+        h1 {
+            font-weight: 900;
+            font-size: 36px;
+            margin-bottom: 2px;
+
+        }
+        h2 {
+            font-weight: 700;
+            font-size: 24px;
+            margin-top: 2px;
+        }
         .axis path,
         .axis line {
             fill: none;
             stroke: lightgrey; }
+        .axis .label {
+            font-weight: 400;
+            fill: black;
+        }
 
         .dataArea {
             stroke: 1px steelblue;
@@ -29,8 +51,18 @@
 
 </head>
 <body>
+<h1>WORLD POPULATION ESTIMATES</h1>
+<form>
+    Scale:
+    <label><input type="radio" name="scale" value="linear" checked>Linear</label>
+    <label><input type="radio" name="scale" value="log">Log</label>  
+</form>
+<form>
+    Consensus analysis:
+    <label><input type="radio" name="consensus" value="all" checked>All Data</label>
+    <label><input type="radio" name="consensus" value="trends">Trends</label>  
+</form>
     <div id="vis"></div>
-
 
 	<script src = "differenceGraph.js"></script>
 
