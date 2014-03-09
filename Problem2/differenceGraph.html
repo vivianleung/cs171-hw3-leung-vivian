@@ -50,6 +50,14 @@
             margin-right: 15%;
             font-weight: 300;
         }
+        .legend rect,
+        .legend text {
+            fill-opacity: 0.5;
+        }
+        .selected rect, 
+        .selected text {
+            fill-opacity: 1.0 !important;
+        }
 
 
     </style>
@@ -75,8 +83,8 @@
 <form>
     Divergence Type:
     <label><input type="radio" name="divergeType" value="absolute" checked>Absolute</label>
-    <label><input type="radio" name="divergeType" value="diverge">Percent</label>  
-    <p>Click and hold ALT to zoom only along the x-axis and to pan along this zoom setting. Otherwise, scroll/double-click and click/drag to zoom/pan in x- and y-directions.</p>
+    <label><input type="radio" name="divergeType" value="percent">Percent</label>  
+    <p>Click and hold ALT to zoom only along the x-axis and to pan along this zoom setting. Otherwise, scroll/double-click and click/drag to zoom/pan in x- and y-directions. Log Scale only for looking at All Data in Population vs. Time! </p>
 </form>    
 
     <div id="vis"></div>
