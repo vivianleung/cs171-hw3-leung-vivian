@@ -44,11 +44,10 @@
             fill: steelblue;
                 }
 
-        .path {
-            stroke: steelblue;
-            fill: none;
+        .path { fill: none; }
+        .All.path { stroke: steelblue;}
+        .Womens.path { stroke: red;}
 
-        }
 
         .overviewPath {
             stroke-width:1;
@@ -61,17 +60,20 @@
 
         .detailArea {
             stroke: none;
-            fill:steelblue;
             fill-opacity:0.5;
         }
 
-        .points{
-            fill:steelblue;
-        }
+        .All.detailArea, .All.points { fill: steelblue;}
+        .Womens.detailArea, .Womens.points {fill: red;}
+
+        .legend.Womens { fill: red;}
+        .legend.All{ fill: steelblue;}
+
         .brush .extent {
             stroke: none;
         }
  
+
 
     </style>
 
@@ -81,7 +83,7 @@
 <h2>Women's Health</h2>
 <div id="visUN"></div>
 
-    <script src="unHealth.js"></script>
+    <script src="unHealthAll.js"></script>
 
 
 </body>
