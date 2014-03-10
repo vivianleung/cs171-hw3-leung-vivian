@@ -153,11 +153,6 @@ createOverview = function() {
   .on("click", function(d) {clicked(d)})
   .text(function(d, i) {return "Story "+(i+1)+": "+d.dates[0]+" to "+d.dates[1]})
 
-  var bubble = svg.append("g").attr("id", "storyexpand")
-      .attr("transform", function() {
-        var gY = margin.top + bbOverview.y + d3.select('g.legend')[0][0].getBBox().height+d3.select('g.overview')[0][0].getBBox().height - 5;
-        return "translate("+bbDetail.x+","+gY+")"});
-
   over.append("g").attr("class", "brush")
     .attr({ width: bbOverview.w + brushPadding, transform: "translate("+bbOverview.x+",0)"})
     .call(brush)
@@ -248,14 +243,20 @@ createOverview = function() {
 
   function clicked(story) {
 
+    d3.selectAll('.storyexpand').remove();
+
+    var bubble = svg.append("g").attr("class", "storyexpand")
+      .attr("transform", function() {
+        var gY = margin.top + bbOverview.y + d3.select('g.legend')[0][0].getBBox().height+d3.select('g.overview')[0][0].getBBox().height - 5;
+        return "translate("+bbDetail.x+","+gY+")"})
+    
+    bubble.append("text").text(story.story);
     var textPad = 4;
     var textWidth = bbDetail.w - textPad*2;
-    bubble.append("text").text(story.story)
-    wrap(d3.select('#storyexpand'), textWidth);
+    wrap(d3.select('.storyexpand'), textWidth);
 
 
     var extent = story.dates.map(function(d) {return parseDate(d);})
-    console.log(extent);
     brush = brush.extent(extent);
     var scaledE = scalesOverview.x(brush.extent()[1]);
     var scaledW = scalesOverview.x(brush.extent()[0]);
@@ -265,10 +266,8 @@ createOverview = function() {
     brushDom.select('resize.w').select('rect').attr("transform", "translate("+scaledW+",0)");
     brushed();
 
-
-    d3.select('#storybox').on("click", function(){
-      this.remove();
-      d3.selectAll('.storylines').remove();
+    bubble.on("click", function(){
+      d3.selectAll('.storyexpand').remove();
       brush = brush.clear();
       brushDom.select('.extent').attr({width: 0, x: 0});
       brushDom.select('resize.e').select('rect').attr("transform", "translate(0,0)");
@@ -315,7 +314,7 @@ createOverview = function() {
     
     var rectH = (i+1)*lineH + 2*textPad;
     bubble.append("rect")
-      .attr({id: "storybox", width: bbDetail.w, height: rectH, x: 0, y: -lineH})
+      .attr({class: "storybox", width: bbDetail.w, height: rectH, x: 0, y: -lineH})
 
     return;
 

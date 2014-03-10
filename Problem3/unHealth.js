@@ -113,11 +113,10 @@ createOverview = function() {
   .attr("d", function(d) {return area(d.health); })
   .attr("clip-path", "url(#clip)");
 
-  over.append("g").attr("class", "brush").call(brush)
-    .selectAll("rect").attr({
-      height: bbOverview.h + brushPadding,
-      y: bbOverview.y - brushPadding
-  });
+  over.append("g")
+    .attr({class:"brush",width:bbOverview.w,transform:'translate('+bbOverview.x+',0)'})
+    .call(brush).selectAll("rect")
+    .attr({height: bbOverview.h+brushPadding, y: bbOverview.y - brushPadding});
 
   // gets the set of values of a prop across nested arrays of objects
   function getSet(attr) {
