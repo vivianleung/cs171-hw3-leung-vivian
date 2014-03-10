@@ -1,33 +1,24 @@
-var bbVis, brush, createVis, dataSet, handle, height, margin, svg, svg2, width, zoom;
-var sources;
+var bbVis, brush, createVis, dataSet, handle, height, margin, width, ANames;
+
 margin = {
   top: 50, right: 50, bottom: 50, left: 50
 };
 
 width = 960 - margin.left - margin.right;
-height = 600 - margin.bottom - margin.top;
+height = 570 - margin.bottom - margin.top;
 
 bbVis = {
   x: 0 + 100, y: 10, w: width - 100, h: 300
 };
 
-var padding = 10;
-var LBoxLen = 10;
+var pad = 10, LBoxLen = 10, ttPad = 5;
 
-var Yinput = 'population';
-var lastConsensusInput = 'all';
-var lastDivergenceSelected = 'raw';
-var lastDivergeTypeInput = 'absolute';
+var Yinput = 'pop', lastScaleInput = 'pop',
+    lastConsensusInput = 'all', lastDivergeSelect = 'raw',
+    lastDivergeTypeInput = 'absolute';
 
 dataSet = [];
-
-var getSet = function(attr) {
-  var set = [];
-  dataSet.forEach(function(d) {
-    d.values.forEach(function(e){ set[e[attr]] = e[attr]; }) 
-  });
-  return set;
-}  
+ANames = {};
 
 d3.csv("timeline.csv", function(error, data) {
   if (error) {console.log(error); }
@@ -39,436 +30,331 @@ d3.csv("timeline.csv", function(error, data) {
     data.forEach(function(t) { 
       t.Year = parseInt(t.Year);
       if (t.Year >= 0) {
-        var ests = [];
-        var num = 0;
-        keys.forEach(function(d) { if (t[d]) { ests.push(parseInt(t[d])); num++; } })
+        var ests = [], num = 0;
+        keys.forEach(function(d) { if (t[d]) { 
+          ests.push(parseInt(t[d])); 
+          num++; } })
         if (num > 0) {
           var ext = d3.extent(d3.values(ests));
           var avg = Math.floor(d3.values(ests).reduce(function(a, b){return a+b;})/num);
-          consensus[t.Year] = {'year': t.Year, 'population': avg, 'min': ext[0], 'max': ext[1], 'absolute':0, 'percent':0 };
-        }
-      }
-    });
+          consensus[t.Year] = {'year':t.Year,'pop':avg,'min':ext[0],'max': ext[1],'absolute':0,'percent':0};
+    }}});
 
-    dataSet = keys.map( function(source) {
-      var values = [];
-      data.forEach( function(d) { if (d[source] && d.Year >= 0) { 
-        d.Year = parseInt(d.Year);
-        d[source] = parseInt(d[source]);
-        var absDiff = d[source] - consensus[d.Year].population;
-        var percDiff = (absDiff/consensus[d.Year].population) * 100;
-        values.push({'year': d.Year, 'population': d[source], 'absolute': absDiff, 'percent': percDiff }); 
-        }
-      });
+    dataSet = keys.map( function(a, i) {
+      ANames[a] = i; var values = [];
+      data.forEach( function(d) { if (d[a] && d.Year >= 0) { 
+        d.Year = parseInt(d.Year); d[a] = parseInt(d[a]);
+        var abs = d[a] - consensus[d.Year].pop;
+        var perc = (abs/consensus[d.Year].pop) * 100;
+        values.push({'year': d.Year, 'pop': d[a], 'absolute': abs, 'percent': perc }); 
+      }});
       values.sort(function(a, b){ return a.year - b.year; });
-      return {'source': source, 'values': values};
+      return {'agency': a, 'values': values};
     });
-    dataSet.push({source: 'consensus', 'values': d3.values(consensus)});
-
+    ANames['consensus'] = dataSet.length;
+    dataSet.push({agency: 'consensus', 'values': d3.values(consensus)});
     return createVis();
   }
 });
 
-
-
 createVis = function() {
 
-  var xDom, yDom, xAxis, xScale, yScale, yAxis, srcScale, line, consensusArea, consensusAreaMin, sSelected;
-    
-  // setting scales and axes
-  xDom = d3.extent(d3.values(getSet('year')));
-  yDom = d3.extent(d3.values(getSet('population')));
-  xScale = d3.scale.linear().domain(xDom).range([0, bbVis.w]);
-  yScale = d3.scale.linear().domain(yDom).range([bbVis.h, 0]);
-  srcScale = d3.scale.category10().domain(dataSet.map(function(d) { 
-            return d.source;} ));
-  xAxis = d3.svg.axis().scale(xScale).orient("bottom");
-  yAxis = d3.svg.axis().scale(yScale).orient("left");
+  // scales, axes & constructors, and elements/selectors
+  var xDom, yDom, xAxis, xScale, yScale, yAxis, srcScale, line, area, zoom, bisectYear, getExt, activeData, commas;
+  var svg, legendBox, legend, lines, points, consensusAreas, divergeAreas, yGuide, cGuide, tooltip, tooltext;
 
-  // setting constructors
-  line = d3.svg.line()
-  .interpolate("linear")
-  .x(function(e) { return xScale(e.year) + bbVis.x; })
-  .y(function(e) { return yScale(e.population); });
+  getExt = function(attr) {
+    var set = [];
+    dataSet.forEach(function(d) {
+      d.values.forEach(function(e){ set[e[attr]] = e[attr]; }) });
+    return d3.extent(d3.values(set));
+  }  
+  var parseX = d3.format("4d")
+  var parseY = d3.format(".4s"); 
+  // setting scales, axes constructors
+  xDom = getExt('year');
+  xScale = d3.scale.linear().range([0, bbVis.w]);
+  yScale = d3.scale.linear().range([bbVis.h, 0]);
+  srcScale = d3.scale.category10().domain(dataSet.map(function(d) {return d.agency;} ));
+  xAxis = d3.svg.axis().orient("bottom").tickFormat(function(d) { return parseX(d)});
+  yAxis = d3.svg.axis().orient("left").tickFormat(function(d) { return parseY(d)});
+  line = d3.svg.line().interpolate("linear").x(function(e) {return xScale(e.year)+bbVis.x;});
+  area = d3.svg.area().interpolate("linear");
+  zoom = d3.behavior.zoom().scaleExtent([1, 50]).on("zoom", zoomed);
+  bisectYear = d3.bisector(function(d) {return d.year}).left;
+  commas = d3.format("0,000");
+  resetParams();
 
-  area = d3.svg.area().interpolate("linear")
-    .x(function(d) {return xScale(d.year) + bbVis.x })
-    .y0(yScale(0))
-    .y1(function(d) { return yScale(d[Yinput]) });
+  svg = d3.select("#vis").append("svg")
+    .attr({width:width+margin.left+margin.right, height:height+margin.top+margin.bottom})
+    .append("g").attr({class:'graph', transform:"translate("+margin.left+","+margin.top+")"});
 
-  zoom = d3.behavior.zoom().x(xScale).y(yScale).scaleExtent([1, 50]).on("zoom", zoomed);
-
-  svg = d3.select("#vis").append("svg").attr({
-    width: width+margin.left+margin.right, height:height+margin.top+margin.bottom})
-    .append("g").attr({ class: 'graph',
-      transform: "translate(" + margin.left + "," + margin.top + ")"
-    });
 
   // append svgX, Y axes, clip path
-  svg.append("g").attr("class", "x axis")
-    .attr("transform", "translate("+bbVis.x+","+(bbVis.y + bbVis.h)+")")
-    .call(xAxis)
-    .append("text")
-    .attr({x: bbVis.w, dy: 45, class: "label"})
-    .style("text-anchor", "end")
-    .text("Year");
+  svg.append("g").attr({class:"x axis",transform:"translate("+bbVis.x+","+(bbVis.y+bbVis.h)+")"})
+    .call(xAxis).append("text").attr({class: "label", x: bbVis.w, dy: 45}).text("Year");
 
-  svg.append("g").attr("class", "y axis")
-    .attr("transform", "translate("+bbVis.x+",0)")
-    .call(yAxis)
-    .append("text")
-    .attr({transform:"rotate(-90)", y: bbVis.y, dy:10, dx:-2, class:"label"})
-    .style("text-anchor", "end")
-    .text("Population");
+  svg.append("g").attr({class:"y axis",transform:"translate("+bbVis.x+",0)"})
+    .call(yAxis).append("text")
+    .attr({class:"label",transform:"rotate(-90)",y:bbVis.y+10,dx:-2}).text("Population");
 
-  svg.append("clipPath").attr("id", "clip")
-    .append("rect")
-    .attr({ width: bbVis.w+padding, height: bbVis.h+bbVis.y+padding,
-      transform: "translate("+bbVis.x+","+(padding*-1)+")"
-    });
+  svg.append("clipPath").attr("id", "clip").append("rect")
+    .attr({ width:bbVis.w+pad, height:bbVis.h+bbVis.y+pad, 
+            transform:"translate("+bbVis.x+","+(pad*-1)+")"});
 
-  // append legend
-  var legendBox = d3.select('svg').append("g").attr("class", 'legendBox')
-    .attr("transform", function(d) {
-      var ly = margin.top+bbVis.h+d3.select('g.x.axis')[0][0].getBBox().height+padding;
-      sSelected = dataSet.length;
-      return "translate("+margin.left+","+ly+")"});
-  
-  var legend = legendBox.append("g").attr("class", "legend")
-    .selectAll("g").data(dataSet.map(function(d, i){return [d.source, i]}))
-    .enter().append("g")
-    .attr("class", function(d) { return d[0]+" selected"})
-    .attr("id", function(d) {return "k"+d[1]})
-    .attr("fill", function(d) {return srcScale(d[0])})
-    .on("click", selectThis);
-  
-  legend.append("rect")
-    .attr({ width: LBoxLen, height: LBoxLen })
-    .attr("y", function(d, i) {return i * 18 - LBoxLen});
-
-  legend.append("text")
-    .attr("x", 20)
-    .attr("vertical-align", "text-top")
-    .attr("y", function(d, i) {return i * 18})
-    .text(function(d) {return d[0]});
-
-  legendBox.append("g").selectAll('text')
-    .data(['DESELECT ALL', 'SELECT ALL'])
-    .enter().append('text')
-    .attr("class", "legselectors")
-    .attr("transform", function(d, i)  {
-      var gy = d3.select('.legend')[0][0].getBBox().height+padding+i*18;
-     return "translate(0,"+gy+")";})
-    .on("click", selectThis)
-    .text(function(d) {return d});
-
-  var lines, points, areaMin, area, divergeAreas;
-  var removedSources = {};
+  svg.append("rect").attr({ class:"backdrop", width:bbVis.w+pad, height:bbVis.h+bbVis.y+pad, 
+      transform:"translate("+bbVis.x+","+(pad*-1)+")"});
+  console.log(d3.select('g.graph')[0][0].getBBox().height);
 
   var makeDataViz = function() {
 
-    sources = svg.selectAll(".source").data(dataSet);
-    sources.enter().append("g").attr("class", function(d) {return "source "+d.source});
+    agencies.enter().append("g").attr("class", function(d) {return "agency "+d.agency});
 
-    lines = sources.append("path").attr("class", function(d) {return "line "+d.source})
-      .style("stroke", function(d) {return srcScale(d.source)})
-      .attr("clip-path", "url(#clip)");
+    lines = agencies.append("path").attr("class", function(d) {return "line "+d.agency})
+      .style("stroke", function(d) {return srcScale(d.agency)});
 
-    points = sources.append("g").attr("class", function(d) {return "points "+d.source})
-        .attr("fill", function(d) {return srcScale(d.source)})
-        .attr("clip-path", "url(#clip)")
-        .selectAll(".point")
-        .data(function(d) {return d.values})
-        .enter().append("svg:circle")
-        .call(transform);
+    points = agencies.append("g").attr("class", function(d) {return "points "+d.agency})
+      .attr("fill",function(d){return srcScale(d.agency)}).selectAll("circle")
+      .data(function(d){return d.values}).enter().append("svg:circle");
 
-    svg.append("rect")
-      .attr({class: "overlay", width: width, height: height})
-      .call(zoom);
+    makeOverlay();
   }
-
+  agencies = svg.selectAll(".agency").data(dataSet);
+  activeData = d3.keys(ANames).map(function(d, i) {return i});
   makeDataViz();
+
+     // append legend
+  legendBox = d3.select('svg').append("g").attr("class",'legendBox').attr("transform", 
+    function(d) {return "translate("+bbVis.x+","
+      +(bbVis.y+d3.select('g.graph')[0][0].getBBox().height+2*pad)+")"});
+  
+  legend = legendBox.append("g").selectAll("g")
+    .data(dataSet.map(function(d,i){return [d.agency,i]})).enter().append("g")
+    .attr("class", function(d){return d[0]+" legend selected"})
+    .attr("id",function(d){return"k"+d[1]})
+    .attr("fill",function(d){return srcScale(d[0])}).on("click", selectThis);
+  
+  legend.append("rect").attr({width:LBoxLen,height:LBoxLen})
+    .attr("y",function(d,i){return i*pad*2-LBoxLen});
+
+  legend.append("text").attr("x",20).attr("y", function(d,i) {return i*pad*2})
+    .text(function(d) {return d[0]});
+
+  legendBox.append("g").selectAll('text').data(['DESELECT ALL', 'SELECT ALL'])
+    .enter().append('text').attr("transform", function(d, i)  {
+      return "translate(0,"+(d3.select('.legendBox g')[0][0].getBBox().height+pad+i*pad*2)+")";})
+    .on("click", selectThis).text(function(d) {return d});
+
   zoomed();
 
-  d3.select('body')
-    .on("keyup", function() { zoom.y(yScale);  })
-    .on("keydown", function() { if(d3.event.altKey) {zoom.y(null); } });
+  d3.select('body').on("keyup",function(){zoom.y(yScale);})
+          .on("keydown",function(){if (d3.event.altKey) {zoom.y(null);}});
 
-  var lastScaleInput = 'linear';
   // change from / reset linear and log scales
   d3.selectAll("input[name=scale]").on("click", function() {
     lastScaleInput = $(this).attr("value");
-    scaleChange();
-    resetParams();
-    zoom();
+    makeScale();
   });
 
-  function scaleChange () {
-    if (lastScaleInput == "linear") {
-      yScale = d3.scale.linear().range([bbVis.h, 0]);
-    }
-    else  {
-      yScale = d3.scale.log().range([bbVis.h, 0]); 
-    }
-      xScale.domain(xDom);
-      yScale.domain(yDom);
-
-  }
-
-  
 
   // switch views from all data to consensus analysis
   d3.selectAll("input[name=consensus]").on("click", function() {
     if ($(this).attr("value") != lastConsensusInput){
       lastConsensusInput = $(this).attr("value");
-      if (lastConsensusInput == 'trends') {
+      agencies.remove();        
 
-        var sGs = d3.selectAll('.source:not(.consensus)')
-        sGs.data([]);
-        sGs.remove();
-        svg.select('rect.overlay').remove();
+      if (lastConsensusInput == 'trends') { makeTrends(); } 
+      else {  legend.classed('selected', true);
+              agencies = svg.selectAll(".agency").data(dataSet);
+              activeData = d3.keys(ANames).map(function(d, i) {return i});
+              Yinput="pop", consensusAreas = null;
+              makeDataViz(); }
+      resetParams(); 
+      zoomed();
+  }});
 
-        legend.classed('selected', false);
-        legend.select('.consensus').classed('selected', true);
-
-
-        makeTrends();
-        resetParams();
-        zoomed();
-
-      } 
-      else {
-        var remaining = d3.selectAll('.source')
-        remaining.data([]);
-        remaining.remove();
-        svg.select('rect.overlay').remove();
-        Yinput="population";
-
-        makeDataViz();
-        zoomed();
-      }
-    }
-  });
-
-  function makeTrends() {
-    xScale.domain(xDom);
-    yScale.domain(yDom);
-
-    var consensus = d3.select('.source.consensus');
-    if (!consensus[0][0]) { 
-      var sourceData = dataMap[dataMap.length-1]
-      consensus = sources.append("g").data(sourceData)
-          .attr("class", function(d) {return "source "+d.source});
-    }
-    if (!consensus.select('.line')) {
-      consensus.append("path").attr("class", function(d) {return "line "+d.source})
-        .style("stroke", function(d) {return srcScale(d.source)})
-        .attr("clip-path", "url(#clip)");         
-    }
-    if (!consensus.select('.points')){
-      consensus.append("g").attr("class", function(d) {return "points "+d.source})
-        .attr("fill", function(d) {return srcScale(d.source)})
-        .attr("clip-path", "url(#clip)")
-        .selectAll(".point")
-        .data(function(d) {return d.values})
-        .enter().append("svg:circle");
-
-    }
-
-    Yinput = 'max';
-    consensusArea = consensus.append("path")
-            .attr({fill: 'steelblue', 'fill-opacity': 0.5, class: '.source.consensus'})
-            .attr("clip-path", "url(#clip)");
-
-    Yinput = 'min';
-    consensusAreaMin = consensus.append("path")
-            .attr({fill: 'white', 'fill-opacity': 1, class: '.source.consensus'})
-            .attr("clip-path", "url(#clip)");
-
-    svg.append("rect")
-      .attr({class: "overlay", width: width, height: height})
-      .call(zoom);
-    Yinput = "population";
-  }
-
-  // switch to viz for divergence
+  // switch to viz for divergence or raw Pop vs. Time
   d3.selectAll("input[name=divergence]").on("click", function() { 
+    if ($(this).attr("value") != lastDivergeSelect) {
+      agencies.remove();
+      agencies = svg.selectAll(".agency").data(activeData.map(function(k){return dataSet[k];}));
+      lastDivergeSelect = $(this).attr("value");
 
-    if ($(this).attr("value") != lastDivergenceSelected) {
-      lastDivergenceSelected = $(this).attr("value");
-      if (lastDivergenceSelected == 'diverge') {
-        makeDiverge();
-        resetParams();
-        zoomed();
-      }
+      if (lastDivergeSelect == 'diverge') {
+        lines = null; points = null;
+        makeDiverge(); 
+       }
+      else { Yinput = 'pop';
+        divergeAreas = null;
+        makeDataViz(); }
 
-      else {
-        d3.selectAll('.source').selectAll('.area').remove();
-        Yinput = 'population';
-        yDom = d3.extent(d3.values(getSet(Yinput)));
-        lastDivergenceSelected = 'raw';
-        scaleChange();
-        resetParams();
-        makeDataViz();
-        zoomed();
-      }
-    }
-
-  });
-
-  function makeDiverge() {
-    Yinput = lastDivergeTypeInput;
-    yDom = d3.extent(d3.values(getSet(Yinput)));
-    xScale.domain(xDom);
-    yScale.domain(yDom);
-
-    d3.selectAll('.source').remove();
-    sources = svg.selectAll(".source").data(dataSet);
-    sources.enter().append("g").attr("class", function(d) {return "source "+d.source});
-
-    divergeAreas = sources.append("path")
-        .attr("class", function(d) {return 'area '+d.source})
-        .attr("fill", function(d) {return srcScale(d.source)})
-        .attr("fill-opacity", 0.3)
-        .attr("clip-path", "url(#clip)");
-
-    svg.append("rect")
-      .attr({class: "overlay", width: width, height: height})
-      .call(zoom);
-
-  }
+      makeScale();
+  }});
 
   d3.selectAll("input[name=divergeType]").on("click", function() { 
-    if (lastDivergenceSelected == 'diverge' && $(this).attr('value') != lastDivergeTypeInput)  {
-        Yinput = $(this).attr('value');
-        lastDivergeTypeInput = Yinput;
-        yDom = d3.extent(d3.values(getSet(Yinput)));
-        yScale.domain(yDom);
-        resetParams();
-        zoomed();
+    if (lastDivergeSelect=='diverge' && $(this).attr('value')!=lastDivergeTypeInput)  {
+      Yinput = $(this).attr('value');
+      lastDivergeTypeInput = Yinput;
+      resetParams(); 
+      zoomed();
     }
-
   });
 
+
+  function makeOverlay(){
+    
+    var xAxH = d3.select('g.x.axis')[0][0].getBBox().height;
+    var yAxW = d3.select('g.y.axis')[0][0].getBBox().width;
+
+
+    d3.selectAll('.tip').remove();
+
+    // TOOLTIP
+    tooltip = svg.append("g").attr("class","tip");
+    tooltip.append("g").attr("class","tip guide");
+    yGuide = tooltip.select("g.guide").append("rect")
+      .attr({width:'2px', height:bbVis.h, y:bbVis.y-LBoxLen, visibility: 'hidden'});
+    cGuide = tooltip.select("g.guide").append("circle")
+      .attr({r: 5, visibility: 'hidden'});
+    tooltext = tooltip.append("g").attr({class:'tip text'});
+    var xAtt = bbVis.x+d3.select('g.y.axis text.label')[0][0].getBBox().height+pad;
+    tooltext.append("rect").attr({width:105,height:54,x:xAtt,y:(bbVis.y-LBoxLen)})
+    tooltext.append("g").attr("class","content").selectAll('text')
+      .data(["YEAR", "POP'N", "MIN", "MAX"]).enter().append('text')
+      .attr({x: xAtt}).attr("y", function(d, i) {return bbVis.y+i*(pad+4)})
+      .text(function(d) {return d});
+
+
+    // mouse-following for tooltip adapted from http://bl.ocks.org/gniemetz/4618602
+    d3.selectAll('rect.overlay').remove();
+    svg.append("rect")
+      .attr({class: "overlay", width: bbVis.w+yAxW+2*pad, height: bbVis.h+xAxH+2*pad,
+        x: bbVis.x-yAxW+pad, y: bbVis.y-xAxH/2-pad
+      })
+      .on("mouseover", function(){
+        tooltip.attr("visibility", 'visible');
+        d3.select('.tip g.guide').selectAll('*').attr("visibility", 'visible'); }) 
+      .on("mouseout", function(){
+        tooltip.attr("visibility", 'hidden');
+        d3.select('.tip g.guide').selectAll('*').attr("visibility", 'hidden'); }) 
+      .on("mousemove", mouseMove).call(zoom);
+  }
+
+  function mouseMove() {
+    var mX  = d3.mouse(this)[0]-bbVis.x;
+      var domainX = Math.floor(xScale.invert(mX)),
+           cObj = dataSet[ANames.consensus].values,
+              j = bisectYear(cObj, domainX),
+              d = cObj[j];
+      if(d){
+         guideX = xScale(d.year)+bbVis.x,
+         guideY = yScale(d[Yinput]),
+        ttcont = [['YEAR: '+d.year], ["POP'N: "+commas(d3.round(d.pop,0))],
+                  ['MIN: '+commas(d3.round(d.min,0))],
+                  ['MAX: '+commas(d3.round(d.max,0))]]; 
+        yGuide.attr("transform","translate("+guideX+",0)");
+        cGuide.attr("transform","translate("+guideX+","+guideY+")");
+        tooltext.select('g.content').selectAll('text')
+        .data(ttcont.map(function(d){return d;}))
+        .text(function(d) {return d[0];});
+  }}
+
+  function makeDiverge() {
+    Yinput = lastDivergeTypeInput, lastScaleInput = "linear", lastConsensusInput = "all";
+    agencies.enter().append("g").attr("class", function(d) {return "agency "+d.agency});
+    divergeAreas = agencies.append("path").attr("fill",function(d){return srcScale(d.agency)})
+      .attr("class",function(d){return 'area '+d.agency});
+    makeOverlay();
+  }
+
+  function makeScale () {
+    if (lastScaleInput=="log"&&lastConsensusInput=="all"&&lastDivergeSelect=="raw") {  
+      yScale = d3.scale.log().range([bbVis.h, 0]); }
+    else  { yScale = d3.scale.linear().range([bbVis.h, 0]); }
+    resetParams(), zoomed();
+  }
+  function makeTrends() {
+    Yinput = "pop";
+    legend.classed('selected',false);
+    d3.select('.legend g.consensus').classed('selected',true);
+    lastScaleInput = "linear";
+    $('input[value=linear]').attr('checked',true);
+    activeData = [ANames.consensus];  
+    var Cdata = [{agency:'max', values:dataSet[ANames.consensus].values},
+                 {agency:'min', values:dataSet[ANames.consensus].values}]
+    agencies = svg.selectAll(".agency").data(Cdata);
+    makeDataViz();
+    consensusAreas = agencies.append("path").attr('class', function(d){return 'area '+d.agency});
+  }
   function resetParams(){
+    yDom = getExt(Yinput);
+    xScale.domain(xDom), yScale.domain(yDom);
+    xAxis.scale(xScale), yAxis.scale(yScale);
     zoom.x(xScale).y(yScale);
-    xAxis.scale(xScale);
-    yAxis.scale(yScale);
-
-    zoomed();
   }
-
-  function zoomed(){
-    area.x(function(d) {return xScale(d.year) + bbVis.x })
-    .y0(yScale(0))
-    .y1(function(d) { return yScale(d[Yinput]) });
-
-    line.y(function(e) {return yScale(e[Yinput])})
-    svg.select(".x.axis").call(xAxis);
-    svg.select(".y.axis").call(yAxis);
-    if (lines) {lines.attr("d", function(d) {return line(d.values) });}
-    if (points) {points.call(transform);}
-    if (lastConsensusInput == "trends") { 
-      datum = [consensusArea, area];
-      tempInput = Yinput;
-      consensusArea.attr("d", function(c) {Yinput = "max"; return area(c.values)});
-      consensusAreaMin.attr("d", function(c) {Yinput = "min"; return area(c.values)});
-      Yinput = tempInput;
-    }
-    if (lastDivergenceSelected == "diverge") {divergeAreas.attr('d', function(d) { return area(d.values)});
-      d3.select('.source.consensus').select('.points').remove();
-    }
-
-  }
-
-  function transform(s){
-    s.attr("cx", function(e) {return xScale(e.year) + bbVis.x;})
-        .attr("cy", function(e) {return yScale(e[Yinput]); })
-        .attr("r", 2);
-
-  }
-
-
-// SEPARATE SOURCES.
-// d3.selectAll('.line')[0].forEach(function(e) {console.log(e)})
   function selectThis(){
-    var selectedS = d3.select(this);
-    console.log(selectedS);
-    if (selectedS.classed("legselectors")) {
-      if (selectedS.text() == "DESELECT ALL") {
-        removedSources = d3.selectAll('.source').remove();
-        return legend.classed("selected", false);
-      }
-      else { 
-        d3.select('.overlay').remove();
-        if (Yinput == "population") {
-          if (lastConsensusInput == "trends") { makeTrends(); }
-          else {           
-            legend.classed("selected", true);
-            makeDataViz();
-          }
-        }
-        else {
-          legend.classed("selected", true);
-          makeDiverge();
-        }
-        zoomed();
-      }
-    }
-    else {
-      var sName = '.'+selectedS.text().replace(/ /g,'.');
-      if (selectedS.classed("selected")) { 
-        selectedS.classed("selected",false)
-        selected
-        removed d3.select('.source'+sName).remove();
-      }
+    var thisA = d3.select(this);
+
+    // [1] Deselect specific Agency
+    if (thisA.classed("selected")) { 
+      thisA.classed("selected",false);
+      var sName = '.'+thisA.text().replace(/ /g,'.');
+      d3.select('.agency'+sName).remove();
+      var aIndex = parseInt(thisA.attr("id").split('k')[1]);
+      activeData.splice( activeData.indexOf(aIndex) ,1); }
+
+    else { agencies.remove();
+
+      // [2] Deselect ALL Agencies
+      if (thisA.text() == "DESELECT ALL") {
+          legend.classed("selected", false);
+          activeData = []; }
       else {
-        d3.select(this).classed("selected", true);
-        d3.select('.overlay').remove();
-        if (Yinput == "population" && lastConsensusInput == "trends") { makeTrends(); }
-        else {           
-          legend.classed("selected", true);
-          var sourceData;
-          dataSet.forEach(function(d) {
-            if (d.source == selectedS.text()) {sourceData = d; return;}
-          });
-
-          var sourceG = sources.select(sName)
-          /*var sourceG = d3.select('g.graph').append("g").data(sourceData)
-            .attr("class", function(d) {return "source "+d.source});
-*/
-          if (Yinput == "population")  {
-            sourceG.append("path").attr("class", function(d) {return "line "+d.source})
-              .style("stroke", function(d) {return srcScale(d.source)})
-              .attr("clip-path", "url(#clip)");         
-
-            sourceG.append("g").attr("class", function(d) {return "points "+d.source})
-              .attr("fill", function(d) {return srcScale(d.source)})
-              .attr("clip-path", "url(#clip)")
-              .selectAll(".point")
-              .data(function(d) {return d.values})
-              .enter().append("svg:circle");
-          }
+        if (Yinput == "pop" && lastConsensusInput == "trends") { makeTrends(); }
+        else {
+          // [3] Select ALL Agencies
+          if (thisA.text() == "SELECT ALL") { 
+            legend.classed("selected", true);
+            activeData = d3.keys(ANames).map(function(d, i) {return i});
+            agencies = svg.selectAll(".agency").data(dataSet); }
           
-          else {
-            Yinput = lastDivergeTypeInput;
-            yDom = d3.extent(d3.values(getSet(Yinput)));
-            xScale.domain(xDom);
-            yScale.domain(yDom);
+          // [4] Select specific Agency
+          else {  thisA.classed("selected", true);  
+            var aIndex = parseInt(thisA.attr("id").split('k')[1]);
+            activeData.push(aIndex);
+            agencies = svg.selectAll(".agency")
+                          .data(activeData.map(function(k){return dataSet[k];})); }
 
-            sourceG.append("path")
-                .attr("class", function(d) {return 'area '+d.source})
-                .attr("fill", function(d) {return srcScale(d.source)})
-                .attr("fill-opacity", 0.3).attr("clip-path", "url(#clip)");
-          }
-
-          svg.append("rect")
-            .attr({class: "overlay", width: width, height: height}).call(zoom);          
+          if (lastDivergeSelect == "raw") { makeDataViz(); }
+          else { makeDiverge(); }
         }
-        // for all options, need to zoom to re-draw
+        makeOverlay();
         zoomed();
-      }
-    }
-  };
+  }}};
+  
+  function zoomed(){
+    var tformPts=function(transition){
+      transition.attr("cx",function(e){return xScale(e.year) + bbVis.x;})
+       .attr("cy",function(e){return yScale(e[Yinput]); }).attr("r", 2); }
+    var tformLN=function(transition){transition.attr("d", function(d){return line(d.values); })}
+    var tformCA=function(transition){transition.attr("d", function(c){Yinput=c.agency; return area(c.values);})}
+    var tformDA=function(transition){transition.attr('d',function(d){return area(d.values);})}
 
+    area.x(function(d) {return xScale(d.year) + bbVis.x })
+        .y0(yScale(0)).y1(function(d) { return yScale(d[Yinput]) });
+    line.y(function(e) {return yScale(e[Yinput])});
+    
+    var transition = d3.transition().duration(1000).ease("linear");
+
+    svg.select(".x.axis").transition().call(xAxis); 
+    svg.select(".y.axis").transition().call(yAxis);
+    if (lines) {lines.transition().call(tformLN); }
+    if (points) {points.transition().call(tformPts); }
+    if (divergeAreas) {divergeAreas.transition().call(tformDA)}; 
+    if (consensusAreas) { 
+      area.y0(function(d) {return yScale(d.pop);});
+      var tempInput = Yinput; consensusAreas.transition().call(tformCA);
+      Yinput = tempInput; d3.select('g.graph').select('.agency.min path.line').remove();
+    }   
+  };
 };
