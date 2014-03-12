@@ -22,9 +22,11 @@
 
 <h2>Part 2: Sketching</h2>
 
-![Alt text](/Problem2/differenceGraph.png "From HW3 Problem 2 sketch:
-")
+![Alt text](/Problem2/differenceGraph.png)
+![Alt text](/img/DS2.jpg)
+
+
 
 <h2>Part 3: Reflection</h2>
-
+![Alt text](/img/DS1.jpg)
 
